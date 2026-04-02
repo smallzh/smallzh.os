@@ -1,1 +1,25 @@
-site_name: My Docs
+site_name: Linux/Windows命令知识库
+theme:
+    name: smzhbook
+nav:
+  - 首页: index.md
+  - Linux:
+    - 基础命令: linux/basic-commands.md
+    - 文件权限: linux/file-permissions.md
+    - 文本处理: linux/text-processing.md
+    - 系统信息: linux/system-info.md
+    - 用户管理: linux/user-management.md
+    - 进程管理: linux/process-management.md
+    - 网络: linux/networking.md
+    - 包管理: linux/package-management.md
+  - Windows:
+    - 基础命令: windows/basic-commands.md
+    - 文件权限: windows/file-permissions.md
+    - 系统信息: windows/system-info.md
+    - 用户管理: windows/user-management.md
+    - 进程管理: windows/process-management.md
+    - 网络: windows/networking.md
+    - 包管理: windows/package-management.md
+  - 脚本编程:
+    - Bash脚本: scripting/bash.md
+    - PowerShell脚本: scripting/powershell.md
