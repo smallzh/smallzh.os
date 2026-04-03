@@ -20,6 +20,7 @@ nav:
     - 进程管理: windows/process-management.md
     - 网络: windows/networking.md
     - 包管理: windows/package-management.md
+    - PowerShell概述: windows/powershell-overview.md
   - 脚本编程:
     - Bash脚本: scripting/bash.md
     - PowerShell脚本: scripting/powershell.md

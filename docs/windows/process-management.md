@@ -144,7 +144,174 @@ wmic process where processid=1234 delete
 wmic process where processid=1234 call setpriority 32
 ```
 
-## 0x04 进程优先级
+## 0x04 PowerShell 后台启动 exe 应用
+
+### Start-Process - 基础后台启动
+```powershell
+# 后台启动应用（隐藏窗口）
+Start-Process -FilePath "notepad.exe" -WindowStyle Hidden
+
+# 后台启动并指定工作目录
+Start-Process -FilePath "C:\app\server.exe" -WorkingDirectory "C:\app" -WindowStyle Hidden
+
+# 后台启动并传递参数
+Start-Process -FilePath "python.exe" -ArgumentList "script.py", "--port", "8080" -WindowStyle Hidden
+
+# 后台启动并等待完成（同步执行但不显示窗口）
+Start-Process -FilePath "backup.exe" -WindowStyle Hidden -Wait
+```
+
+### Start-Process - 获取进程信息
+```powershell
+# 后台启动并返回进程对象
+$proc = Start-Process -FilePath "notepad.exe" -WindowStyle Hidden -PassThru
+$proc.Id          # 获取 PID
+$proc.ProcessName # 获取进程名
+$proc.HasExited   # 检查是否已退出
+
+# 后台启动并监控进程状态
+$proc = Start-Process -FilePath "longtask.exe" -WindowStyle Hidden -PassThru
+while (-not $proc.HasExited) {
+    Write-Host "进程运行中... PID: $($proc.Id)"
+    Start-Sleep -Seconds 5
+}
+Write-Host "进程已退出，退出码: $($proc.ExitCode)"
+```
+
+### Start-Process - 重定向输出
+```powershell
+# 后台启动并重定向输出到文件
+Start-Process -FilePath "app.exe" -ArgumentList "--verbose" -WindowStyle Hidden `
+    -RedirectStandardOutput "C:\logs\app-output.log" `
+    -RedirectStandardError "C:\logs\app-error.log"
+
+# 后台启动并合并标准输出和错误输出
+Start-Process -FilePath "app.exe" -WindowStyle Hidden `
+    -RedirectStandardOutput "C:\logs\app.log" `
+    -RedirectStandardError "C:\logs\app.log"
+```
+
+### [Diagnostics.Process] - 完全隐藏窗口
+```powershell
+# 使用 .NET 类完全隐藏窗口（更可靠）
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = "C:\app\server.exe"
+$psi.Arguments = "--port 8080"
+$psi.CreateNoWindow = $true
+$psi.UseShellExecute = $false
+$psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+$proc = [System.Diagnostics.Process]::Start($psi)
+$proc.Id
+
+# 封装为函数
+function Start-HiddenProcess {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$FilePath,
+        [string]$Arguments = "",
+        [string]$WorkingDirectory = ""
+    )
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $FilePath
+    $psi.Arguments = $Arguments
+    $psi.CreateNoWindow = $true
+    $psi.UseShellExecute = $false
+    if ($WorkingDirectory) {
+        $psi.WorkingDirectory = $WorkingDirectory
+    }
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
+# 使用示例
+$proc = Start-HiddenProcess -FilePath "node.exe" -Arguments "server.js" -WorkingDirectory "C:\myapp"
+```
+
+### Start-Job - PowerShell 后台任务
+```powershell
+# 在后台 Job 中启动进程
+Start-Job -ScriptBlock {
+    Start-Process -FilePath "notepad.exe" -Wait
+}
+
+# 查看后台 Job
+Get-Job
+
+# 查看 Job 输出
+Receive-Job -Id 1
+
+# 移除已完成的 Job
+Remove-Job -Id 1
+```
+
+### WScript.Shell - COM 对象方式
+```powershell
+# 使用 WScript.Shell 完全隐藏窗口
+$wshell = New-Object -ComObject WScript.Shell
+$wshell.Run("C:\app\server.exe --port 8080", 0, $false)
+# 第二个参数 0 表示隐藏窗口
+# 第三个参数 $false 表示不等待进程完成
+
+# 等待进程完成
+$wshell.Run("C:\app\backup.exe", 0, $true)
+```
+
+### 实际应用场景
+
+```powershell
+# 场景1: 后台启动 Web 服务器
+Start-Process -FilePath "node.exe" `
+    -ArgumentList "server.js" `
+    -WorkingDirectory "C:\projects\webapp" `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput "C:\logs\webapp.log" `
+    -RedirectStandardError "C:\logs\webapp-error.log"
+
+# 场景2: 后台启动数据库服务
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = "C:\Program Files\MySQL\bin\mysqld.exe"
+$psi.Arguments = "--defaults-file=C:\my.ini"
+$psi.CreateNoWindow = $true
+$psi.UseShellExecute = $false
+$psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+$mysqlProc = [System.Diagnostics.Process]::Start($psi)
+Write-Host "MySQL 已启动，PID: $($mysqlProc.Id)"
+
+# 场景3: 定时任务中后台运行脚本
+Start-Process -FilePath "powershell.exe" `
+    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\scripts\cleanup.ps1" `
+    -WindowStyle Hidden
+
+# 场景4: 批量后台启动多个服务
+$servers = @(
+    @{ Path = "C:\app1\server.exe"; Args = "--port 8080" },
+    @{ Path = "C:\app2\server.exe"; Args = "--port 8081" },
+    @{ Path = "C:\app3\server.exe"; Args = "--port 8082" }
+)
+
+foreach ($s in $servers) {
+    $proc = Start-Process -FilePath $s.Path -ArgumentList $s.Args -WindowStyle Hidden -PassThru
+    Write-Host "启动 $($s.Path) - PID: $($proc.Id)"
+}
+```
+
+### WindowStyle 选项对比
+
+| 选项 | 说明 |
+|------|------|
+| `Hidden` | 隐藏窗口，不显示任何界面 |
+| `Minimized` | 最小化窗口到任务栏 |
+| `Maximized` | 最大化窗口 |
+| `Normal` | 正常显示窗口（默认） |
+
+### `-WindowStyle Hidden` vs `CreateNoWindow = $true`
+
+| 方式 | 适用场景 | 区别 |
+|------|----------|------|
+| `-WindowStyle Hidden` | GUI 应用、带窗口的程序 | 窗口创建但隐藏 |
+| `CreateNoWindow = $true` + `UseShellExecute = $false` | 控制台应用 | 不创建控制台窗口，更彻底 |
+
+## 0x05 进程优先级
 
 ### wmic - 修改优先级
 ```cmd
